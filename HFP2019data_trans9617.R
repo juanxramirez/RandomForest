@@ -1,7 +1,11 @@
 #RandomForest
 if(!requireNamespace("randomForest", quietly = TRUE))
   install.packages("randomForest", quiet = TRUE, dependencies = TRUE)
+if (!requireNamespace("caret",quietly = TRUE))
+  install.packages("caret", quiet = TRUE, dependencies = TRUE)
+
 library(randomForest)
+library(caret)
 
 #import data
 highHFP.drivers.nogain<-read.delim("G:/Conservation Solution Lab/Juan/data_tables/random_forest/final_2/Suitable_vs_unsuitable/trans9617_final_2_last_two.txt")
@@ -42,7 +46,42 @@ names<-c("Order", "Diet", "Body mass", "High HFP extent suitable", "High HFP ext
 #na.action = na.omit
 data_na.omit<-na.omit(highHFP.drivers.nogain)
 
-highHFP.drivers.RFnogain.noRS<- randomForest(trans9617~., data=data_na.omit[,vars], na.action = na.omit, ntree=1000, importance=TRUE)
+#Set training and test data
+
+train_split<-createDataPartition(data_na.omit$trans9617,p=0.75,list=FALSE)
+
+training<-data_na.omit[train_split,]
+testing<-data_na.omit[-train_split,]
+
+#Initial model
+
+control <- trainControl(method="repeatedcv", number=10, repeats=3, search="grid")
+tunegrid <- expand.grid(.mtry=c(sqrt(ncol(training))))
+metric <- "Accuracy"
+modellist <- list()
+for (ntree in c(1000, 1500, 2000, 2500)) {
+  fit <- train(trans9617~., data=training, method="rf", metric=metric, tuneGrid=tunegrid, trControl=control, ntree=ntree)
+  key <- toString(ntree)
+  modellist[[key]] <- fit
+}
+
+results <- resamples(modellist)
+summary(results)
+dotplot(results)
+
+
+##################
+
+
+
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+metric <- "Accuracy"
+mtry <- sqrt(ncol(training))
+tunegrid <- expand.grid(.mtry=mtry)
+rf_default <- train(trans9617~., data=training, method="rf", metric=metric, tuneGrid=tunegrid, trControl=control)
+print(rf_default)
+
+highHFP.drivers.RFnogain.noRS<- randomForest(trans9617~., data=training[,vars], na.action = na.omit, ntree=1000, importance=TRUE)
 
 #highHFP.drivers.RFnogain.noRS
 
